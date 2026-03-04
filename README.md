@@ -22,6 +22,8 @@ This repo is configuration only. There's no application code to build. It runs t
 | [Memory](https://www.npmjs.com/package/@modelcontextprotocol/server-memory) | stdio | Scratchpad / notes |
 | [Notion](https://notion.so) | HTTP | Notion MCP (OAuth) |
 | [GitHub](https://github.com) | stdio | Repo access via GitHub MCP |
+| [Trigger.dev](https://trigger.dev) | stdio | Background jobs and task orchestration |
+| [PostgreSQL replica](https://www.npmjs.com/package/@modelcontextprotocol/server-postgres) | stdio | Read-only database queries |
 
 That's 100+ tools accessible through a single authenticated endpoint.
 
@@ -128,6 +130,8 @@ If config reload is enabled (it is by default), the agent picks up changes to `m
 | `JAM_MCP_TOKEN` | Jam |
 | `INTERCOM_API_TOKEN` | Intercom |
 | `GITHUB_PERSONAL_ACCESS_TOKEN` | GitHub MCP |
+| `TRIGGER_ACCESS_TOKEN` | Trigger.dev |
+| `REPLICA_DATABASE_URL` | PostgreSQL replica (full connection string) |
 | `MCP_PROXY_TOKEN` | nginx proxy auth |
 
 **Optional tuning** (with defaults):
@@ -272,6 +276,34 @@ codex mcp add 1mcp http://127.0.0.1:9494/mcp
 
 The exact file or UI depends on which Codex client you're using; the key requirement is to use OAuth, not a static bearer token.
 
+## Daemon management (macOS)
+
+A control script (`ctl.sh`) and a launchd watchdog keep the stack running across reboots and recover from crashes automatically.
+
+### Start everything
+
+```bash
+./ctl.sh start
+```
+
+This runs `docker compose up -d` and installs a launchd agent that checks the stack every 5 minutes. If the agent container is unhealthy or stopped, the watchdog restarts it.
+
+### Other commands
+
+```bash
+./ctl.sh stop             # tear down stack and unload watchdog
+./ctl.sh restart          # stop + start
+./ctl.sh status           # show container and watchdog state
+./ctl.sh logs             # tail docker compose logs (default: last 100 lines)
+./ctl.sh logs 500         # tail last 500 lines
+./ctl.sh watchdog-load    # load watchdog without touching containers
+./ctl.sh watchdog-unload  # unload watchdog without touching containers
+```
+
+### How the watchdog works
+
+The plist template (`com.1mcp.watchdog.plist`) uses `__COMPOSE_DIR__` placeholders. When `ctl.sh start` or `ctl.sh watchdog-load` runs, it substitutes the actual repo path and installs the plist to `~/Library/LaunchAgents/`. The watchdog script (`watchdog.sh`) waits for Docker to be available, then checks the agent container's health. Logs go to `logs/watchdog.log` with automatic rotation at 1 MB.
+
 ## Logs and troubleshooting
 
 Logs are written to `./logs/` (mounted into the container). You can also tail them live:
@@ -292,13 +324,16 @@ Sentry uses a local stdio process with a User Auth Token for unattended access �
 
 ```
 .
-├── docker-compose.yml       # 1MCP agent + nginx proxy
-├── mcp.json                 # MCP server definitions
-├── .env.example             # Template for secrets
-├── .env                     # Your secrets (gitignored)
+├── docker-compose.yml            # 1MCP agent + nginx proxy
+├── mcp.json                      # MCP server definitions
+├── .env.example                  # Template for secrets
+├── .env                          # Your secrets (gitignored)
+├── ctl.sh                        # Control script (start/stop/restart/status)
+├── watchdog.sh                   # Launchd watchdog (auto-restarts unhealthy stack)
+├── com.1mcp.watchdog.plist       # Launchd plist template
 ├── proxy/
-│   └── nginx.conf.template  # Reverse proxy config
-└── logs/                    # Runtime logs (gitignored)
+│   └── nginx.conf.*.template     # Reverse proxy configs (oauth / token modes)
+└── logs/                         # Runtime logs (gitignored)
 ```
 
 ## Links
