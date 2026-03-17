@@ -47,12 +47,16 @@ docker compose up -d
 
 This pulls the 1MCP agent image and an nginx:alpine image, then starts both containers. The agent will connect to all configured MCP servers in parallel and report readiness via health checks.
 
-**3. Connect your AI tool**
+**3. Connect OAuth services (Notion, Shortcut, etc)**
+
+Some MCP servers don't take an API key through config, but use OAuth instead. To configure them, visit http://localhost:9494/oauth to sign in to them.
+
+**4. Connect your AI tool**
 
 Point your MCP client at:
 
 ```
-URL:   http://localhost:9494/mcp
+URL:   http://127.0.0.1:9494/mcp
 ```
 
 On first connect, your MCP client will run an OAuth handshake against 1MCP. Complete the browser flow, then restart your client if it doesn't reconnect automatically.
